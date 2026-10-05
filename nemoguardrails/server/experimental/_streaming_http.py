@@ -26,9 +26,11 @@ from nemoguardrails.server.experimental._buffered_kernel import InspectionStage,
 from nemoguardrails.server.experimental._content_checker import ContentChecker, StreamBufferingPolicy
 from nemoguardrails.server.experimental._guarded_operation import UnsupportedGuardedPayload
 from nemoguardrails.server.experimental._guarded_stream import (
+    StreamInspectionUnsupported,
     StreamOutcomeRenderer,
     StreamProcessingFailed,
     StreamUpstreamFailed,
+    UnsupportedStreamInspection,
     guard_provider_stream,
     validate_streaming_policy,
 )
@@ -138,7 +140,10 @@ async def execute_streaming_http(
     if any(type(limit) is not int or limit <= 0 for limit in (max_event_bytes, max_pending_bytes)):
         raise ValueError("Streaming HTTP byte limits must be positive.")
     if streaming_policy is not None:
-        validate_streaming_policy(streaming_policy)
+        try:
+            validate_streaming_policy(streaming_policy)
+        except UnsupportedStreamInspection as failure:
+            return _render_response(render_outcome(StreamInspectionUnsupported(failure)), request.method)
 
     try:
         upstream = await dispatch(request)
